@@ -1,0 +1,5 @@
+{
+  "name": "wordwolf-server",
+  "private": true,
+  "type": "module"
+}
