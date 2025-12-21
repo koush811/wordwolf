@@ -9,8 +9,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'THEME_REQUIRED' })
   }
 
-  // ★ 今はAIを使わず仮データ
-  // 先に「サーバーが動くか」を確認する
   return res.status(200).json({
     citizenWord: 'カレー',
     wolfWord: 'シチュー'
