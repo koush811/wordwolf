@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
 import fetch from "node-fetch";
 
-console.log('API KEY exists:', !!process.env.ANTHROPIC_API_KEY);
+console.log('GEMINI KEY exists:', !!process.env.GEMINI_API_KEY);
 
 /**
  * キャッシュ（theme単位・メモリ）
@@ -59,29 +59,12 @@ function getFallback() {
 /**
  * キャッシュ取得（取得後削除）
  */
-function getFromCache(theme) {
-  const list = wordCache.get(theme);
-  if (!list || list.length === 0) return null;
-
-  const index = Math.floor(Math.random() * list.length);
-  const word = list[index];
-  list.splice(index, 1);
-
-  if (list.length === 0) {
-    wordCache.delete(theme);
-  }
-
-  return word;
-}
-
-/**
- * AI生成
- */
 async function generateWithAI(theme) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const prompt = `あなたはワードウルフ用の単語生成AIです。
+  const prompt = `
+あなたはワードウルフ用の単語生成AIです。
 以下の条件を厳守してください。
 
 ・テーマに沿った名詞の単語ペアを10組生成する
@@ -93,36 +76,34 @@ async function generateWithAI(theme) {
 
 出力形式：
 {
-  "words":[
-    {"citizenWord":"","wolfWord":""}
+  "words": [
+    { "citizenWord": "string", "wolfWord": "string" }
   ]
 }
 
-テーマ：${theme}`;
-
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), 25000);
+テーマ：${theme}
+`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }]
-      }),
-      signal: controller.signal
-    });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            { role: "user", parts: [{ text: prompt }] }
+          ]
+        })
+      }
+    );
 
     if (!res.ok) return null;
 
     const data = await res.json();
-    const text = data.content?.find(c => c.type === "text")?.text;
+    const text =
+      data.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!text) return null;
 
     const jsonText = text.replace(/```json|```/g, "").trim();
@@ -130,18 +111,6 @@ async function generateWithAI(theme) {
 
     if (!Array.isArray(parsed.words) || parsed.words.length !== 10) {
       return null;
-    }
-
-    for (const p of parsed.words) {
-      if (
-        !p.citizenWord ||
-        !p.wolfWord ||
-        p.citizenWord === p.wolfWord ||
-        FORBIDDEN_WORDS.has(p.citizenWord) ||
-        FORBIDDEN_WORDS.has(p.wolfWord)
-      ) {
-        return null;
-      }
     }
 
     return parsed.words;
