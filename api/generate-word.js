@@ -1,5 +1,8 @@
 import fetch from "node-fetch";
 
+console.log('API KEY exists:', !!process.env.ANTHROPIC_API_KEY);
+
+
 /**
  * キャッシュ（theme単位・メモリ）
  * ※ Serverlessの特性上、リクエスト間で消える可能性あり
@@ -29,7 +32,6 @@ const FORBIDDEN_WORDS = new Set(
 /**
  * 入力チェック
  */
-console.log("API KEY exists:", !!process.env.ANTHROPIC_API_KEY);
 
 
 function isValidTheme(theme) {
