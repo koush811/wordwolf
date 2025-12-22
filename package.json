@@ -1,5 +1,8 @@
 {
   "name": "wordwolf-server",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
 }
