@@ -61,6 +61,8 @@ function getFallback() {
  */
 async function generateWithAI(theme) {
   const apiKey = process.env.GEMINI_API_KEY;
+  console.log("GEMINI KEY exists:", !!apiKey);
+
   if (!apiKey) return null;
 
   const prompt = `
@@ -101,6 +103,11 @@ async function generateWithAI(theme) {
       }
     );
 
+    console.log("Gemini status:", res.status);
+
+    const raw = await res.text();
+    console.log("Gemini raw response:", raw);
+    
     if (!res.ok) {
       console.error("Gemini API error:", await res.text());
       return null;
