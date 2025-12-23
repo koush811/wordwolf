@@ -7,6 +7,8 @@ export default async function handler(req, res) {
   res.status(200).json({ ok: true });
 }*/
 
+
+import 'dotenv/config';
 import fetch from "node-fetch";
 
 // キャッシュ（テーマ単位・メモリ）
