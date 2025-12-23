@@ -3,6 +3,8 @@
 ## 使用するプログラミング言語について
 - backendを書くときはjavascriptを使ってください。
 - frontendを書くときはhtml,css,javascriptを使ってください。
+- html,css,jsはファイルを分けて書いてください。
+- htmlの中にcss,jsを書かないでください。
 - そのほかの言語は使わないでください。
 - 拡張機能などを使うときは必ず確認を取ってください。
 
@@ -23,3 +25,9 @@
 
 ## その他
 - 何かを変更するときは必ず事前に確認を取ってください
+- function showPage(id) {
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+  }このコードを使ってください
