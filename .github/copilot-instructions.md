@@ -31,4 +31,3 @@
     });
     document.getElementById(id).classList.add('active');
   }このコードを使ってください
-- APIコードはいじらないで（参照するのはいいよ）
