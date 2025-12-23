@@ -1,18 +1,138 @@
+import 'dotenv/config';
+import fetch from "node-fetch";
+
+// キャッシュ（テーマ単位・メモリ）
+const wordCache = new Map();
+
+// フォールバックワード（10組）
+const FALLBACK_WORDS = [
+  { citizenWord: "りんご", wolfWord: "みかん" },
+  { citizenWord: "犬", wolfWord: "猫" },
+  { citizenWord: "コーヒー", wolfWord: "紅茶" },
+  { citizenWord: "野球", wolfWord: "サッカー" },
+  { citizenWord: "夏", wolfWord: "冬" },
+  { citizenWord: "電車", wolfWord: "バス" },
+  { citizenWord: "ラーメン", wolfWord: "うどん" },
+  { citizenWord: "山", wolfWord: "海" },
+  { citizenWord: "ピアノ", wolfWord: "ギター" },
+  { citizenWord: "映画", wolfWord: "ドラマ" }
+];
+
+// 入力チェック
+function isValidTheme(theme) {
+  return theme && typeof theme === "string" && theme.trim().length > 0 && theme.length <= 20;
+}
+
+// フォールバック取得（AI生成失敗時のみ）
+function getFallback() {
+  return FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+}
+
+// キャッシュ取得（取得後削除）
+function getFromCache(theme) {
+  const cached = wordCache.get(theme);
+  if (!cached || cached.length === 0) return null;
+  return cached.shift();
+}
+
+// AI生成
+async function generateWithAI(theme) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  console.log("=== generateWithAI called ===");
+  console.log("Theme:", theme);
+  console.log("API Key exists:", !!apiKey);
+
+  if (!apiKey) return null;
+
+  const prompt = `
+あなたはワードウルフ用の単語生成AIです。
+
+【条件】
+・テーマに沿った名詞の単語ペアを10組生成
+・citizenWord と wolfWord の両方に必ず単語を入れる
+・同ジャンルだが意味が異なる
+・日本語のみ
+・JSONのみで出力
+・説明文は禁止
+
+【出力形式】
+{
+  "words": [
+    { "citizenWord": "", "wolfWord": "" }
+  ]
+}
+
+テーマ：${theme}
+`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }]
+            }
+          ]
+        })
+      }
+    );
+
+    if (!res.ok) {
+      console.error("Gemini API error:", await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+
+    // ```json を除去して JSON 文字列化
+    const jsonText = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(jsonText);
+
+    if (!Array.isArray(parsed.words) || parsed.words.length !== 10) return null;
+
+    return parsed.words;
+  } catch (e) {
+    console.error("Gemini fetch failed:", e);
+    return null;
+  }
+}
+
+// Vercel Handler
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (req.method !== "POST") {
+    return res.status(200).json(getFallback());
   }
 
-  const { theme } = req.body
-
-  if (!theme) {
-    return res.status(400).json({ error: 'THEME_REQUIRED' })
+  const { theme } = req.body;
+  if (!isValidTheme(theme)) {
+    return res.status(200).json(getFallback());
   }
 
-  // ★ 今はAIを使わず仮データ
-  // 先に「サーバーが動くか」を確認する
-  return res.status(200).json({
-    citizenWord: 'カレー',
-    wolfWord: 'シチュー'
-  })
+  const normalizedTheme = theme.trim();
+
+  // キャッシュにある場合は即返す
+  const cached = getFromCache(normalizedTheme);
+  if (cached) return res.status(200).json(cached);
+
+  // AI生成
+  const words = await generateWithAI(normalizedTheme);
+
+  if (!words) {
+    // AI生成失敗時のみフォールバック
+    return res.status(200).json(getFallback());
+  }
+
+  // AI生成成功時のみキャッシュに保存
+  wordCache.set(normalizedTheme, [...words]);
+
+  // 1つ取り出して返す
+  const word = getFromCache(normalizedTheme);
+  return res.status(200).json(word);
 }

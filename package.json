@@ -1,5 +1,9 @@
 {
   "name": "wordwolf-server",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "node-fetch": "^3.3.2"
+  }
 }
