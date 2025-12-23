@@ -1,13 +1,3 @@
-/*export const runtime = 'nodejs';
-
-export default async function handler(req, res) {
-  console.log('Function called');
-  console.log('API KEY exists:', !!process.env.ANTHROPIC_API_KEY);
-
-  res.status(200).json({ ok: true });
-}*/
-
-
 import 'dotenv/config';
 import fetch from "node-fetch";
 
@@ -28,19 +18,12 @@ const FALLBACK_WORDS = [
   { citizenWord: "映画", wolfWord: "ドラマ" }
 ];
 
-const FORBIDDEN_WORDS = new Set(
-  FALLBACK_WORDS.flatMap(w => [w.citizenWord, w.wolfWord])
-);
-
 // 入力チェック
 function isValidTheme(theme) {
-  if (!theme || typeof theme !== "string") return false;
-  if (theme.trim().length === 0) return false;
-  if (theme.length > 20) return false;
-  return true;
+  return theme && typeof theme === "string" && theme.trim().length > 0 && theme.length <= 20;
 }
 
-// フォールバック取得
+// フォールバック取得（AI生成失敗時のみ）
 function getFallback() {
   return FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
 }
@@ -55,6 +38,10 @@ function getFromCache(theme) {
 // AI生成
 async function generateWithAI(theme) {
   const apiKey = process.env.GEMINI_API_KEY;
+  console.log("=== generateWithAI called ===");
+  console.log("Theme:", theme);
+  console.log("API Key exists:", !!apiKey);
+
   if (!apiKey) return null;
 
   const prompt = `
@@ -62,7 +49,7 @@ async function generateWithAI(theme) {
 
 【条件】
 ・テーマに沿った名詞の単語ペアを10組生成
-・citizenWord と wolfWord を持つ
+・citizenWord と wolfWord の両方に必ず単語を入れる
 ・同ジャンルだが意味が異なる
 ・日本語のみ
 ・JSONのみで出力
@@ -104,6 +91,7 @@ async function generateWithAI(theme) {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return null;
 
+    // ```json を除去して JSON 文字列化
     const jsonText = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(jsonText);
 
@@ -128,13 +116,20 @@ export default async function handler(req, res) {
   }
 
   const normalizedTheme = theme.trim();
+
+  // キャッシュにある場合は即返す
   const cached = getFromCache(normalizedTheme);
   if (cached) return res.status(200).json(cached);
 
+  // AI生成
   const words = await generateWithAI(normalizedTheme);
-  if (!words) return res.status(200).json(getFallback());
 
-  // キャッシュに保存
+  if (!words) {
+    // AI生成失敗時のみフォールバック
+    return res.status(200).json(getFallback());
+  }
+
+  // AI生成成功時のみキャッシュに保存
   wordCache.set(normalizedTheme, [...words]);
 
   // 1つ取り出して返す
