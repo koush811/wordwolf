@@ -1,11 +1,137 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Word Wolf - ゲーム</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>動作確認</h1>
+    <!-- ページ1: お題入力・設定画面 -->
+    <div id="page-setup" class="page active">
+        <div class="container">
+            <h1>Word Wolf</h1>
+            <h2>ゲーム設定</h2>
+            
+            <div class="form-group">
+                <label for="theme">お題を入力（20字以内）</label>
+                <input type="text" id="theme" placeholder="例：果物" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label for="timeLimit">制限時間（分）</label>
+                <input type="number" id="timeLimit" value="2" min="1" max="10">
+            </div>
+
+            <div class="form-group">
+                <label>プレイヤーのニックネーム（3〜20人）</label>
+                <div id="nicknameInputs"></div>
+                <button class="btn-secondary" onclick="addNicknameInput()">+ ニックネームを追加</button>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+
+            <button class="btn-primary" onclick="startGame()">ゲーム開始</button>
+        </div>
+    </div>
+
+    <!-- ページ2: 本人確認画面 -->
+    <div id="page-memorize" class="page">
+        <div class="container">
+            <h2>本人確認</h2>
+            <p id="memorizeStatus" class="status"></p>
+            <p class="instruction">本人が確認してから、次へ進んでください</p>
+            <div class="player-confirm">
+                <p id="currentPlayerName" class="player-name-large">プレイヤー名</p>
+            </div>
+            <button class="btn-primary" onclick="showMemorizeWord()">本人です</button>
+        </div>
+    </div>
+
+    <!-- ページ3b: 単語暗記画面 -->
+    <div id="page-word-memorize" class="page">
+        <div class="container">
+            <h2>あなたの単語</h2>
+            <p id="memorizeProgress" class="status"></p>
+            <div class="word-card">
+                <div id="memorizeWordContent" class="word-display">単語</div>
+            </div>
+            <p class="instruction">この単語を覚えてください</p>
+            <button class="btn-primary" onclick="proceedToNextPlayer()">次へ</button>
+        </div>
+    </div>
+
+    <!-- ページ4: ゲーム画面 -->
+    <div id="page-game" class="page">
+        <div class="container">
+            <div class="timer-section">
+                <div id="timerDisplay" class="timer-large">00:00</div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="game-controls">
+                <button class="btn-control" id="pauseBtn" onclick="toggleTimer()">一時停止</button>
+                <button class="btn-control" onclick="addTime()">+1分</button>
+                <button class="btn-control" onclick="moveToVoting()">投票に進む</button>
+            </div>
+
+            <div class="wolf-info">
+                <p>ウルフの人数: <span id="wolfCountDisplay">1</span></p>
+            </div>
+
+            <p class="theme-display">テーマ: <span id="themeDisplay"></span></p>
+        </div>
+    </div>
+
+    <!-- ページ5: 投票画面 -->
+    <div id="page-voting" class="page">
+        <div class="container">
+            <h2>投票画面</h2>
+            <p class="instruction">ウルフだと思う人を選択してください</p>
+            <div id="votingSection" class="voting-grid">
+                <!-- プレイヤーカードがここに動的に生成される -->
+            </div>
+            <button id="submitVoteBtn" class="btn-primary" disabled onclick="submitVote()">投票完了</button>
+        </div>
+    </div>
+
+    <!-- ページ6: 結果画面 -->
+    <div id="page-result" class="page">
+        <div class="container">
+            <h1 id="resultTitle" class="result-title">結果</h1>
+            
+            <div class="result-section">
+                <h3>勝利した役職</h3>
+                <p id="resultWinnerRole" class="winner-role"></p>
+            </div>
+
+            <div class="result-section">
+                <h3>全員のプレイヤー</h3>
+                <div id="playersList" class="players-list">
+                    <!-- プレイヤーのバッジがここに動的に生成される -->
+                </div>
+            </div>
+
+            <div class="result-section">
+                <h3>単語</h3>
+                <div class="words-display">
+                    <div class="word-item citizen">
+                        <p class="word-label">市民の単語</p>
+                        <p id="resultCitizenWord" class="word-text">単語</p>
+                    </div>
+                    <div class="word-item wolf">
+                        <p class="word-label">ウルフの単語</p>
+                        <p id="resultWolfWord" class="word-text">単語</p>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="resetGame()">設定画面に戻る</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>

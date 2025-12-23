@@ -10,6 +10,7 @@ let gameState = {
     timerInterval: null,
     remainingTime: 0,
     timerRunning: false,
+    initialTime: 0,
 };
 
 // フォールバック単語ペア
@@ -26,7 +27,7 @@ const FALLBACK_WORDS = [
     { citizenWord: '花子', wolfWord: '太郎' },
 ];
 
-// 画面切り替え関数
+// 画面切り替え関数（仕様書に指定されたコード）
 function showPage(id) {
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
@@ -46,7 +47,7 @@ function addNicknameInput() {
     container.appendChild(newRow);
 }
 
-// ゲーム開始処理
+// ゲーム開始処理（お題・時間・ニックネームの検証を行う）
 async function startGame() {
     const theme = document.getElementById('theme').value.trim();
     const timeLimit = parseInt(document.getElementById('timeLimit').value);
@@ -58,20 +59,33 @@ async function startGame() {
     const errorMessage = document.getElementById('errorMessage');
     errorMessage.classList.remove('show');
 
-    // バリデーション
-    if (!theme) {
+    // バリデーション：お題
+    if (!theme || theme.length === 0) {
         errorMessage.textContent = 'お題を入力してください';
         errorMessage.classList.add('show');
         return;
     }
 
+    if (theme.length > 20) {
+        errorMessage.textContent = 'お題は20字以内です';
+        errorMessage.classList.add('show');
+        return;
+    }
+
+    // バリデーション：プレイヤー数
     if (nicknames.length < 3) {
         errorMessage.textContent = 'プレイヤーは3人以上必要です';
         errorMessage.classList.add('show');
         return;
     }
 
-    // 同じニックネームをチェック
+    if (nicknames.length > 20) {
+        errorMessage.textContent = 'プレイヤーは20人以下です';
+        errorMessage.classList.add('show');
+        return;
+    }
+
+    // バリデーション：同じニックネーム
     if (new Set(nicknames).size !== nicknames.length) {
         errorMessage.textContent = '同じニックネームは使用できません';
         errorMessage.classList.add('show');
@@ -84,6 +98,8 @@ async function startGame() {
     gameState.timeLimit = timeLimit;
     gameState.currentMemorizeIndex = 0;
     gameState.selectedVotePlayer = -1;
+    gameState.timerRunning = false;
+    gameState.initialTime = timeLimit * 60;
 
     // ニックネームをlocalStorageに保存
     localStorage.setItem('wordwolf_nicknames', JSON.stringify(nicknames));
@@ -91,42 +107,43 @@ async function startGame() {
     // APIから単語を取得
     await fetchWordPair();
 
-    // ウルフをランダムに決定
+    // ウルフをランダムに決定（参加者の中からランダムに1名）
     gameState.wolfIndex = Math.floor(Math.random() * gameState.players.length);
 
-    // 単語表示画面へ
-    showWordDisplay();
+    // 直接本人確認画面へ移動
+    startMemorizePhase();
 }
 
-// 単語ペアを取得する関数
+// 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
 async function fetchWordPair() {
     try {
         const response = await fetch('/api/generate-word.js');
         if (!response.ok) throw new Error('API呼び出し失敗');
         
         const words = await response.json();
+        // APIレスポンスから１組をランダムに選択
         gameState.wordPair = words[Math.floor(Math.random() * words.length)];
     } catch (error) {
         console.log('APIエラー: ' + error.message);
-        // フォールバック処理
+        // フォールバック：保存した単語ペアからランダムに１組選択
         gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
 }
 
-// 単語表示画面を表示
+// 単語表示画面を表示（全員で見える状態で表示）
 function showWordDisplay() {
     const wordCardContent = document.getElementById('wordCardContent');
     wordCardContent.textContent = gameState.wordPair.citizenWord;
     showPage('page-word-display');
 }
 
-// 暗記フェーズを開始
+// 暗記フェーズを開始（本人確認を出してから単語を表示）
 function startMemorizePhase() {
     gameState.currentMemorizeIndex = 0;
     showNextMemorizePlayer();
 }
 
-// 本人確認画面を表示
+// 本人確認画面を表示（本人でない人に違う人の情報がわからないようにする）
 function showNextMemorizePlayer() {
     if (gameState.currentMemorizeIndex >= gameState.players.length) {
         // 全員の暗記が完了したらゲーム開始
@@ -142,7 +159,7 @@ function showNextMemorizePlayer() {
     showPage('page-memorize');
 }
 
-// 本人確認後、個別の単語を表示
+// 本人確認後、個別の単語を表示（ウルフと市民で異なる単語を表示）
 function showMemorizeWord() {
     const isWolf = gameState.currentMemorizeIndex === gameState.wolfIndex;
     const word = isWolf ? gameState.wordPair.wolfWord : gameState.wordPair.citizenWord;
@@ -154,30 +171,34 @@ function showMemorizeWord() {
     showPage('page-word-memorize');
 }
 
-// 次のプレイヤーへ
+// 次のプレイヤーへ移動
 function proceedToNextPlayer() {
     gameState.currentMemorizeIndex++;
     showNextMemorizePlayer();
 }
 
-// ゲームタイマーを開始
+// ゲームタイマーを開始（設定画面で入力された時間を使う）
 function startGameTimer() {
     gameState.remainingTime = gameState.timeLimit * 60; // 分を秒に変換
+    gameState.initialTime = gameState.remainingTime;
     gameState.timerRunning = true;
     
-    document.getElementById('wolfCountDisplay').textContent = '1'; // 仕様では常に1
+    document.getElementById('wolfCountDisplay').textContent = '1'; // 仕様ではウルフは1名
+    document.getElementById('themeDisplay').textContent = gameState.theme;
     showPage('page-game');
     
     updateTimerDisplay();
     gameState.timerInterval = setInterval(updateTimer, 1000);
 }
 
-// タイマーを更新
+// タイマーを更新する関数（1秒ごとに呼ばれる）
 function updateTimer() {
     if (gameState.timerRunning) {
         gameState.remainingTime--;
         updateTimerDisplay();
+        updateProgressBar();
         
+        // タイマー終了時に投票画面へ自動移動
         if (gameState.remainingTime <= 0) {
             clearInterval(gameState.timerInterval);
             moveToVoting();
@@ -185,12 +206,18 @@ function updateTimer() {
     }
 }
 
-// タイマー表示を更新
+// タイマー表示を更新（"mm:ss"形式）
 function updateTimerDisplay() {
     const minutes = Math.floor(gameState.remainingTime / 60);
     const seconds = gameState.remainingTime % 60;
     const display = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     document.getElementById('timerDisplay').textContent = display;
+}
+
+// プログレスバーを更新
+function updateProgressBar() {
+    const percentage = (gameState.remainingTime / gameState.initialTime) * 100;
+    document.getElementById('progressFill').style.width = percentage + '%';
 }
 
 // タイマーを一時停止/再開
@@ -200,13 +227,14 @@ function toggleTimer() {
     btn.textContent = gameState.timerRunning ? '一時停止' : '再開';
 }
 
-// 時間を追加
+// 時間を追加する関数（+1分）
 function addTime() {
     gameState.remainingTime += 60; // 1分追加
+    gameState.initialTime += 60;
     updateTimerDisplay();
 }
 
-// 投票画面へ移動
+// 投票画面へ移動（参加者全員のニックネームを表示）
 function moveToVoting() {
     clearInterval(gameState.timerInterval);
     
@@ -237,30 +265,32 @@ function selectVotePlayer(index, element) {
     gameState.selectedVotePlayer = index;
     
     // 投票ボタンを有効化
-    document.querySelector('.btn-primary').disabled = false;
+    document.getElementById('submitVoteBtn').disabled = false;
 }
 
-// 投票を確定
+// 投票を確定する関数（勝敗を判定）
 function submitVote() {
     if (gameState.selectedVotePlayer === -1) {
         alert('誰かを選択してください');
         return;
     }
     
-    // 結果を計算
+    // 勝敗判定：選択された人がウルフかどうか
+    // ウルフに投票されたら市民の勝ち、それ以外の人に投票されたらウルフの勝ち
     const selectedPlayerIsWolf = gameState.selectedVotePlayer === gameState.wolfIndex;
+    const citizensWon = selectedPlayerIsWolf;
     
     // 結果画面を表示
-    showResultPage(selectedPlayerIsWolf);
+    showResultPage(citizensWon);
 }
 
-// 結果画面を表示
+// 結果画面を表示（全員のニックネーム、ウルフのハイライト、正解単語、勝利役職）
 function showResultPage(citizensWon) {
     const resultTitle = document.getElementById('resultTitle');
     const playersList = document.getElementById('playersList');
     const resultWinnerRole = document.getElementById('resultWinnerRole');
     
-    // 勝利判定
+    // 勝利判定表示
     if (citizensWon) {
         resultTitle.textContent = '🎉 市民の勝利！';
         resultTitle.className = 'result-title win';
@@ -271,7 +301,7 @@ function showResultPage(citizensWon) {
         resultWinnerRole.textContent = 'ウルフ';
     }
     
-    // プレイヤーリストを表示
+    // プレイヤーリストを表示（ウルフはハイライト）
     playersList.innerHTML = '';
     gameState.players.forEach((playerName, index) => {
         const badge = document.createElement('div');
@@ -287,8 +317,14 @@ function showResultPage(citizensWon) {
     showPage('page-result');
 }
 
-// ゲームをリセット
+// ゲームをリセットする関数（設定画面に戻る）
 function resetGame() {
+    // タイマーをクリア
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+    }
+    
+    // ゲーム状態を初期化
     gameState = {
         theme: '',
         players: [],
@@ -300,21 +336,14 @@ function resetGame() {
         timerInterval: null,
         remainingTime: 0,
         timerRunning: false,
+        initialTime: 0,
     };
     
     // 設定画面に戻る
     showPage('page-setup');
-    
-    // 入力欄をリセット
-    document.getElementById('theme').value = '';
-    document.getElementById('timeLimit').value = '2';
-    document.getElementById('nicknameInputs').innerHTML = '';
-    addNicknameInput();
-    addNicknameInput();
-    addNicknameInput();
 }
 
-// 初期化処理
+// 初期化処理（DOMContentLoadedイベント）
 window.addEventListener('DOMContentLoaded', function() {
     // 初期ニックネーム入力欄を3つ作成
     addNicknameInput();
@@ -332,4 +361,7 @@ window.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // 設定画面を表示
+    showPage('page-setup');
 });
