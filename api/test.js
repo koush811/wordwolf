@@ -20,7 +20,7 @@ import handler from './generate-word.js';
 const req = {
   method: 'POST',
   body: {
-    theme: '果物'  // ここを任意のテーマに変えられます
+    theme: 'あ'  // ここを任意のテーマに変えられます
   }
 };
 
