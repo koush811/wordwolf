@@ -65,19 +65,19 @@ async function generateWithAI(theme) {
 
   const prompt = `
 あなたはワードウルフ用の単語生成AIです。
-以下の条件を厳守してください。
 
-・テーマに沿った名詞の単語ペアを10組生成する
+【条件】
+・テーマに沿った名詞の単語ペアを10組生成
 ・citizenWord と wolfWord を持つ
-・同一ジャンルだが明確に異なる単語
-・同じ単語ペアを生成しない
+・同ジャンルだが意味が異なる
 ・日本語のみ
-・出力はJSONのみ
+・JSONのみで出力
+・説明文は禁止
 
-出力形式：
+【出力形式】
 {
   "words": [
-    { "citizenWord": "string", "wolfWord": "string" }
+    { "citizenWord": "", "wolfWord": "" }
   ]
 }
 
@@ -92,20 +92,28 @@ async function generateWithAI(theme) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
-            { role: "user", parts: [{ text: prompt }] }
+            {
+              role: "user",
+              parts: [{ text: prompt }]
+            }
           ]
         })
       }
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error("Gemini API error:", await res.text());
+      return null;
+    }
 
     const data = await res.json();
+
     const text =
       data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) return null;
 
+    // ```json ``` を除去
     const jsonText = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(jsonText);
 
@@ -114,7 +122,8 @@ async function generateWithAI(theme) {
     }
 
     return parsed.words;
-  } catch {
+  } catch (e) {
+    console.error("Gemini fetch failed:", e);
     return null;
   }
 }
