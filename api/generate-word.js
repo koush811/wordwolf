@@ -9,17 +9,10 @@ export default async function handler(req, res) {
 
 import fetch from "node-fetch";
 
-console.log('GEMINI KEY exists:', !!process.env.GEMINI_API_KEY);
-
-/**
- * キャッシュ（theme単位・メモリ）
- * ※ Serverlessの特性上、リクエスト間で消える可能性あり
- */
+// キャッシュ（テーマ単位・メモリ）
 const wordCache = new Map();
 
-/**
- * フォールバックワード（10組）
- */
+// フォールバックワード（10組）
 const FALLBACK_WORDS = [
   { citizenWord: "りんご", wolfWord: "みかん" },
   { citizenWord: "犬", wolfWord: "猫" },
@@ -37,11 +30,7 @@ const FORBIDDEN_WORDS = new Set(
   FALLBACK_WORDS.flatMap(w => [w.citizenWord, w.wolfWord])
 );
 
-/**
- * 入力チェック
- */
-
-
+// 入力チェック
 function isValidTheme(theme) {
   if (!theme || typeof theme !== "string") return false;
   if (theme.trim().length === 0) return false;
@@ -49,20 +38,21 @@ function isValidTheme(theme) {
   return true;
 }
 
-/**
- * フォールバック取得
- */
+// フォールバック取得
 function getFallback() {
   return FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
 }
 
-/**
- * キャッシュ取得（取得後削除）
- */
+// キャッシュ取得（取得後削除）
+function getFromCache(theme) {
+  const cached = wordCache.get(theme);
+  if (!cached || cached.length === 0) return null;
+  return cached.shift();
+}
+
+// AI生成
 async function generateWithAI(theme) {
   const apiKey = process.env.GEMINI_API_KEY;
-  console.log("GEMINI KEY exists:", !!apiKey);
-
   if (!apiKey) return null;
 
   const prompt = `
@@ -88,7 +78,7 @@ async function generateWithAI(theme) {
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,30 +93,19 @@ async function generateWithAI(theme) {
       }
     );
 
-    console.log("Gemini status:", res.status);
-
-    const raw = await res.text();
-    console.log("Gemini raw response:", raw);
-    
     if (!res.ok) {
       console.error("Gemini API error:", await res.text());
       return null;
     }
 
     const data = await res.json();
-
-    const text =
-      data.candidates?.[0]?.content?.parts?.[0]?.text;
-
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return null;
 
-    // ```json ``` を除去
     const jsonText = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(jsonText);
 
-    if (!Array.isArray(parsed.words) || parsed.words.length !== 10) {
-      return null;
-    }
+    if (!Array.isArray(parsed.words) || parsed.words.length !== 10) return null;
 
     return parsed.words;
   } catch (e) {
@@ -135,37 +114,28 @@ async function generateWithAI(theme) {
   }
 }
 
-/**
- * Vercel Handler
- */
+// Vercel Handler
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).json(getFallback());
   }
 
   const { theme } = req.body;
-
   if (!isValidTheme(theme)) {
     return res.status(200).json(getFallback());
   }
 
   const normalizedTheme = theme.trim();
-
   const cached = getFromCache(normalizedTheme);
-  if (cached) {
-    return res.status(200).json(cached);
-  }
+  if (cached) return res.status(200).json(cached);
 
   const words = await generateWithAI(normalizedTheme);
-  if (!words) {
-    return res.status(200).json(getFallback());
-  }
+  if (!words) return res.status(200).json(getFallback());
 
+  // キャッシュに保存
   wordCache.set(normalizedTheme, [...words]);
 
+  // 1つ取り出して返す
   const word = getFromCache(normalizedTheme);
   return res.status(200).json(word);
 }
-
-
-
