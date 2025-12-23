@@ -23,3 +23,9 @@
 
 ## その他
 - 何かを変更するときは必ず事前に確認を取ってください
+- function showPage(id) {
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+  }このコードを使ってください
