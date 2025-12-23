@@ -1,4 +1,4 @@
-import 'dotenv/config';
+/*import 'dotenv/config';
 import handler from './generate-word.js';
 
 
@@ -11,4 +11,29 @@ const res = {
 };
 
 // handler を呼び出す
+handler(req, res);*/
+
+import 'dotenv/config';
+import handler from './generate-word.js';
+
+// テスト用の擬似リクエスト
+const req = {
+  method: 'POST',
+  body: {
+    theme: '果物'  // ここを任意のテーマに変えられます
+  }
+};
+
+const res = {
+  status(code) {
+    this.statusCode = code;
+    return this;
+  },
+  json(data) {
+    console.log('status:', this.statusCode, 'response:', data);
+  }
+};
+
+// 実行
 handler(req, res);
+
