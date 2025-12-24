@@ -109,16 +109,42 @@ async function startGame() {
 }
 
 // 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
+<<<<<<< HEAD
 /*async function fetchWordPair() {
+=======
+async function fetchWordPair() {
+    // ローカル環境判定（Live Serverなど）
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1' ||
+                       window.location.port !== '';
+    
+    if (isLocalhost) {
+        console.log('ローカル環境のため、フォールバック単語を使用します');
+        gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+        return;
+    }
+    
+>>>>>>> 092a7bf94c275a93823e575192a9970114e38fbc
     try {
-        const response = await fetch('/api/generate-word.js');
-        if (!response.ok) throw new Error('API呼び出し失敗');
+        const response = await fetch('/api/generate-word', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                theme: gameState.theme
+            })
+        });
         
-        const words = await response.json();
-        // APIレスポンスから１組をランダムに選択
-        gameState.wordPair = words[Math.floor(Math.random() * words.length)];
+        if (!response.ok) {
+            throw new Error('APIレスポンスエラー: ' + response.status);
+        }
+        
+        const wordPair = await response.json();
+        // APIから直接1組の単語ペアを受け取る
+        gameState.wordPair = wordPair;
     } catch (error) {
-        console.log('APIエラー: ' + error.message);
+        console.log('APIエラーのため、フォールバック単語を使用します: ' + error.message);
         // フォールバック：保存した単語ペアからランダムに１組選択
         gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
