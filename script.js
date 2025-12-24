@@ -110,45 +110,40 @@ async function startGame() {
 
 
 async function fetchWordPair() {
-    // ローカル環境判定（Live Serverなど）
-    const isLocalhost = window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1' ||
-                       window.location.port !== '';
-    
-    if (isLocalhost) {
-        console.log('ローカル環境のため、フォールバック単語を使用します');
-        gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
-        return;
-    }
-    
-
     try {
         const response = await fetch('/api/generate-word', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                theme: gameState.theme
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: gameState.theme })
         });
-        
+
         if (!response.ok) {
-            throw new Error('APIレスポンスエラー: ' + response.status);
+            throw new Error('API呼び出し失敗');
         }
-        
+
         const wordPair = await response.json();
-        // APIから直接1組の単語ペアを受け取る
+
+        if (
+            !wordPair ||
+            typeof wordPair.citizenWord !== 'string' ||
+            typeof wordPair.wolfWord !== 'string'
+        ) {
+            throw new Error('不正なレスポンス形式');
+        }
+
         gameState.wordPair = wordPair;
+        console.log('✅ AI単語取得成功:', wordPair);
+
     } catch (error) {
-        console.log('APIエラーのため、フォールバック単語を使用します: ' + error.message);
-        // フォールバック：保存した単語ペアからランダムに１組選択
-        gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+        console.warn('⚠ API失敗 → フォールバック使用:', error.message);
+        gameState.wordPair =
+            FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
 }
+
 // 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
 // 単語ペアを取得する関数（バックエンドAPIを使用）
-async function fetchWordPair() {
+/*async function fetchWordPair() {
     try {
         const response = await fetch('/api/generate-word', {
             method: 'POST',
@@ -185,6 +180,7 @@ async function fetchWordPair() {
             FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
 }
+*/
 
 
 // 単語表示画面を表示（全員で見える状態で表示）
@@ -373,6 +369,11 @@ function showResultPage(citizensWon) {
     
     showPage('page-result');
 }
+
+const isLocalhost =
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1';
+
 
 // ゲームをリセットする関数（設定画面に戻る）
 function resetGame() {
