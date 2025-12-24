@@ -132,6 +132,18 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js" charset="UTF-8"></script>
+    <script>
+        // スクリプト読み込みエラーをチェック
+        window.addEventListener('error', function(e) {
+            console.log('エラーが発生しました:', e.message, 'ファイル:', e.filename, '行:', e.lineno);
+        });
+        
+        // 関数が定義されているか確認
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('addNicknameInput関数が定義されているか:', typeof addNicknameInput);
+            console.log('startGame関数が定義されているか:', typeof startGame);
+        });
+    </script>
 </body>
 </html>

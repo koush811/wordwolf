@@ -105,7 +105,13 @@ async function startGame() {
     localStorage.setItem('wordwolf_nicknames', JSON.stringify(nicknames));
 
     // APIから単語を取得
-    await fetchWordPair();
+    try {
+        await fetchWordPair();
+    } catch (error) {
+        // APIエラーの場合はゲームを開始しない
+        console.log('エラー: 単語の取得に失敗したため、ゲームを開始できません');
+        return;
+    }
 
     // ウルフをランダムに決定（参加者の中からランダムに1名）
     gameState.wolfIndex = Math.floor(Math.random() * gameState.players.length);
@@ -114,7 +120,7 @@ async function startGame() {
     startMemorizePhase();
 }
 
-// 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
+// 単語ペアを取得する関数（APIから取得、ローカル環境のみフォールバック）
 async function fetchWordPair() {
     // ローカル環境判定（Live Serverなど）
     const isLocalhost = window.location.hostname === 'localhost' || 
@@ -127,6 +133,7 @@ async function fetchWordPair() {
         return;
     }
     
+    // デプロイ環境ではAPIのみを使用
     try {
         const response = await fetch('/api/generate-word', {
             method: 'POST',
@@ -139,16 +146,19 @@ async function fetchWordPair() {
         });
         
         if (!response.ok) {
-            throw new Error('APIレスポンスエラー: ' + response.status);
+            const errorText = await response.text();
+            throw new Error('APIレスポンスエラー: ' + response.status + ' - ' + errorText);
         }
         
         const wordPair = await response.json();
+        console.log('APIから単語ペアを取得しました:', wordPair);
         // APIから直接1組の単語ペアを受け取る
         gameState.wordPair = wordPair;
     } catch (error) {
-        console.log('APIエラーのため、フォールバック単語を使用します: ' + error.message);
-        // フォールバック：保存した単語ペアからランダムに１組選択
-        gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+        console.log('エラー: APIからの単語取得に失敗しました - ' + error.message);
+        // デプロイ環境ではフォールバックを使用せず、エラーを表示
+        alert('エラー: 単語の生成に失敗しました。\n詳細: ' + error.message + '\nもう一度お試しください。');
+        throw error;
     }
 }
 
