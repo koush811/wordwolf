@@ -145,7 +145,7 @@ async function fetchWordPair() {
         // フォールバック：保存した単語ペアからランダムに１組選択
         gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
-}*/
+}
 // 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
 // 単語ペアを取得する関数（バックエンドAPIを使用）
 async function fetchWordPair() {
