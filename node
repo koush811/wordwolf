@@ -1,0 +1,7 @@
+=== generateWithAI called ===
+Theme: yukkuri-games
+API Key exists: true
+status: 200 response: {
+  "citizenWord": "ゆっくり音声",
+  "wolfWord": "棒読み"
+}

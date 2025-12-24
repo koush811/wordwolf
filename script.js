@@ -14,17 +14,11 @@ let gameState = {
 };
 
 // フォールバック単語ペア
+
 const FALLBACK_WORDS = [
-    { citizenWord: 'りんご', wolfWord: 'なし' },
-    { citizenWord: 'みかん', wolfWord: 'オレンジ' },
-    { citizenWord: 'ぶどう', wolfWord: 'スイカ' },
-    { citizenWord: 'バナナ', wolfWord: 'プランテイン' },
-    { citizenWord: 'いちご', wolfWord: 'ブルーベリー' },
-    { citizenWord: '犬', wolfWord: '狼' },
-    { citizenWord: '猫', wolfWord: 'ライオン' },
-    { citizenWord: '鳥', wolfWord: 'こうもり' },
-    { citizenWord: 'トマト', wolfWord: 'パプリカ' },
-    { citizenWord: '花子', wolfWord: '太郎' },
+    { citizenWord: 'copilot', wolfWord: 'GTP' },
+    { citizenWord: '豪先輩', wolfWord: '前川先生' },
+    { citizenWord: '大晦日', wolfWord: 'お正月' },
 ];
 
 // 画面切り替え関数（仕様書に指定されたコード）
@@ -115,7 +109,7 @@ async function startGame() {
 }
 
 // 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
-async function fetchWordPair() {
+/*async function fetchWordPair() {
     try {
         const response = await fetch('/api/generate-word.js');
         if (!response.ok) throw new Error('API呼び出し失敗');
@@ -128,7 +122,47 @@ async function fetchWordPair() {
         // フォールバック：保存した単語ペアからランダムに１組選択
         gameState.wordPair = FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
+}*/
+// 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
+// 単語ペアを取得する関数（バックエンドAPIを使用）
+async function fetchWordPair() {
+    try {
+        const response = await fetch('/api/generate-word', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                theme: gameState.theme
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('API呼び出し失敗');
+        }
+
+        const wordPair = await response.json();
+
+        // 念のための形式チェック
+        if (
+            !wordPair ||
+            typeof wordPair.citizenWord !== 'string' ||
+            typeof wordPair.wolfWord !== 'string'
+        ) {
+            throw new Error('不正なレスポンス形式');
+        }
+
+        gameState.wordPair = wordPair;
+
+        console.log('単語取得成功:', wordPair);
+
+    } catch (error) {
+        console.warn('⚠ API失敗 → フォールバック使用:', error.message);
+        gameState.wordPair =
+            FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+    }
 }
+
 
 // 単語表示画面を表示（全員で見える状態で表示）
 function showWordDisplay() {
