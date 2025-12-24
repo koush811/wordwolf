@@ -3,8 +3,9 @@ let gameState = {
     theme: '',
     players: [],
     timeLimit: 0,
+    wolfCount: 1,
     wordPair: null,
-    wolfIndex: -1,
+    wolfIndices: [],
     currentMemorizeIndex: 0,
     selectedVotePlayer: -1,
     timerInterval: null,
@@ -12,6 +13,18 @@ let gameState = {
     timerRunning: false,
     initialTime: 0,
 };
+
+// ウルフをランダムに選出する関数
+function selectRandomWolves(playerCount, wolfCount) {
+    const indices = Array.from({ length: playerCount }, (_, i) => i);
+    const wolves = [];
+    for (let i = 0; i < wolfCount; i++) {
+        const randomIdx = Math.floor(Math.random() * indices.length);
+        wolves.push(indices[randomIdx]);
+        indices.splice(randomIdx, 1);
+    }
+    return wolves.sort((a, b) => a - b);
+}
 
 // フォールバック単語ペア
 const FALLBACK_WORDS = [
@@ -47,10 +60,11 @@ function addNicknameInput() {
     container.appendChild(newRow);
 }
 
-// ゲーム開始処理（お題・時間・ニックネームの検証を行う）
+// ゲーム開始処理（お題・時間・ウルフの人数・ニックネームの検証を行う）
 async function startGame() {
     const theme = document.getElementById('theme').value.trim();
     const timeLimit = parseInt(document.getElementById('timeLimit').value);
+    const wolfCount = parseInt(document.getElementById('wolfCount').value);
     const nicknameInputs = document.querySelectorAll('.nickname-input');
     const nicknames = Array.from(nicknameInputs)
         .map(input => input.value.trim())
@@ -85,6 +99,19 @@ async function startGame() {
         return;
     }
 
+    // バリデーション：ウルフの人数
+    if (wolfCount < 1) {
+        errorMessage.textContent = 'ウルフは1人以上必要です';
+        errorMessage.classList.add('show');
+        return;
+    }
+
+    if (wolfCount >= nicknames.length) {
+        errorMessage.textContent = 'ウルフはプレイヤーより少なく設定してください';
+        errorMessage.classList.add('show');
+        return;
+    }
+
     // バリデーション：同じニックネーム
     if (new Set(nicknames).size !== nicknames.length) {
         errorMessage.textContent = '同じニックネームは使用できません';
@@ -96,6 +123,7 @@ async function startGame() {
     gameState.theme = theme;
     gameState.players = nicknames;
     gameState.timeLimit = timeLimit;
+    gameState.wolfCount = wolfCount;
     gameState.currentMemorizeIndex = 0;
     gameState.selectedVotePlayer = -1;
     gameState.timerRunning = false;
@@ -107,8 +135,8 @@ async function startGame() {
     // APIから単語を取得
     await fetchWordPair();
 
-    // ウルフをランダムに決定（参加者の中からランダムに1名）
-    gameState.wolfIndex = Math.floor(Math.random() * gameState.players.length);
+    // ウルフをランダムに決定（参加者の中からランダムに複数名選出）
+    gameState.wolfIndices = selectRandomWolves(gameState.players.length, gameState.wolfCount);
 
     // 直接本人確認画面へ移動
     startMemorizePhase();
@@ -161,7 +189,7 @@ function showNextMemorizePlayer() {
 
 // 本人確認後、個別の単語を表示（ウルフと市民で異なる単語を表示）
 function showMemorizeWord() {
-    const isWolf = gameState.currentMemorizeIndex === gameState.wolfIndex;
+    const isWolf = gameState.wolfIndices.includes(gameState.currentMemorizeIndex);
     const word = isWolf ? gameState.wordPair.wolfWord : gameState.wordPair.citizenWord;
     
     document.getElementById('memorizeWordContent').textContent = word;
@@ -183,7 +211,7 @@ function startGameTimer() {
     gameState.initialTime = gameState.remainingTime;
     gameState.timerRunning = true;
     
-    document.getElementById('wolfCountDisplay').textContent = '1'; // 仕様ではウルフは1名
+    document.getElementById('wolfCountDisplay').textContent = gameState.wolfCount;
     document.getElementById('themeDisplay').textContent = gameState.theme;
     showPage('page-game');
     
@@ -277,7 +305,7 @@ function submitVote() {
     
     // 勝敗判定：選択された人がウルフかどうか
     // ウルフに投票されたら市民の勝ち、それ以外の人に投票されたらウルフの勝ち
-    const selectedPlayerIsWolf = gameState.selectedVotePlayer === gameState.wolfIndex;
+    const selectedPlayerIsWolf = gameState.wolfIndices.includes(gameState.selectedVotePlayer);
     const citizensWon = selectedPlayerIsWolf;
     
     // 結果画面を表示
@@ -305,8 +333,9 @@ function showResultPage(citizensWon) {
     playersList.innerHTML = '';
     gameState.players.forEach((playerName, index) => {
         const badge = document.createElement('div');
-        badge.className = index === gameState.wolfIndex ? 'player-badge wolf' : 'player-badge citizen';
-        badge.textContent = playerName + (index === gameState.wolfIndex ? '（ウルフ）' : '（市民）');
+        const isWolf = gameState.wolfIndices.includes(index);
+        badge.className = isWolf ? 'player-badge wolf' : 'player-badge citizen';
+        badge.textContent = playerName + (isWolf ? '（ウルフ）' : '（市民）');
         playersList.appendChild(badge);
     });
     
@@ -329,8 +358,9 @@ function resetGame() {
         theme: '',
         players: [],
         timeLimit: 0,
+        wolfCount: 1,
         wordPair: null,
-        wolfIndex: -1,
+        wolfIndices: [],
         currentMemorizeIndex: 0,
         selectedVotePlayer: -1,
         timerInterval: null,
