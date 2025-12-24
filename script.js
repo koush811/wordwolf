@@ -108,10 +108,7 @@ async function startGame() {
     startMemorizePhase();
 }
 
-// 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
-<<<<<<< HEAD
-/*async function fetchWordPair() {
-=======
+
 async function fetchWordPair() {
     // ローカル環境判定（Live Serverなど）
     const isLocalhost = window.location.hostname === 'localhost' || 
@@ -124,7 +121,7 @@ async function fetchWordPair() {
         return;
     }
     
->>>>>>> 092a7bf94c275a93823e575192a9970114e38fbc
+
     try {
         const response = await fetch('/api/generate-word', {
             method: 'POST',
