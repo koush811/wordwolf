@@ -70,25 +70,33 @@ async function generateWithAI(theme) {
   );
 
   if (!res.ok) {
-    const errText = await res.text();
-    console.error("Gemini API error:", errText);
+    console.error("Gemini API error:", await res.text());
     throw new Error("Gemini APIエラー");
   }
 
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
   if (!text) {
     throw new Error("AIレスポンスが空です");
   }
 
-  const jsonText = text.replace(/```json|```/g, "").trim();
-  const parsed = JSON.parse(jsonText);
-
-  if (!Array.isArray(parsed.words) || parsed.words.length !== 10) {
-    throw new Error("AIの出力形式が不正です");
+  // JSON抽出
+  let parsed;
+  try {
+    const jsonText = text.replace(/```json|```/g, "").trim();
+    parsed = JSON.parse(jsonText);
+  } catch {
+    console.error("Raw AI text:", text);
+    throw new Error("JSONパース失敗");
   }
 
-  return parsed.words;
+  if (!Array.isArray(parsed.words) || parsed.words.length < 1) {
+    throw new Error("words配列が存在しません");
+  }
+
+  // 10個に丸める（重要）
+  return parsed.words.slice(0, 10);
 }
 
 // Vercel Handler
