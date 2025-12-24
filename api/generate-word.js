@@ -4,28 +4,14 @@ import fetch from "node-fetch";
 // キャッシュ（テーマ単位・メモリ）
 const wordCache = new Map();
 
-// フォールバックワード（10組）
-const FALLBACK_WORDS = [
-  { citizenWord: "りんご", wolfWord: "みかん" },
-  { citizenWord: "犬", wolfWord: "猫" },
-  { citizenWord: "コーヒー", wolfWord: "紅茶" },
-  { citizenWord: "野球", wolfWord: "サッカー" },
-  { citizenWord: "夏", wolfWord: "冬" },
-  { citizenWord: "電車", wolfWord: "バス" },
-  { citizenWord: "ラーメン", wolfWord: "うどん" },
-  { citizenWord: "山", wolfWord: "海" },
-  { citizenWord: "ピアノ", wolfWord: "ギター" },
-  { citizenWord: "映画", wolfWord: "ドラマ" }
-];
-
 // 入力チェック
 function isValidTheme(theme) {
-  return theme && typeof theme === "string" && theme.trim().length > 0 && theme.length <= 20;
-}
-
-// フォールバック取得（AI生成失敗時のみ）
-function getFallback() {
-  return FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+  return (
+    theme &&
+    typeof theme === "string" &&
+    theme.trim().length > 0 &&
+    theme.length <= 20
+  );
 }
 
 // キャッシュ取得（取得後削除）
@@ -42,7 +28,9 @@ async function generateWithAI(theme) {
   console.log("Theme:", theme);
   console.log("API Key exists:", !!apiKey);
 
-  if (!apiKey) return null;
+  if (!apiKey) {
+    throw new Error("APIキーが設定されていません");
+  }
 
   const prompt = `
 あなたはワードウルフ用の単語生成AIです。
@@ -65,74 +53,76 @@ async function generateWithAI(theme) {
 テーマ：${theme}
 `;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }]
-            }
-          ]
-        })
-      }
-    );
-
-    if (!res.ok) {
-      console.error("Gemini API error:", await res.text());
-      return null;
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ]
+      })
     }
+  );
 
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
-
-    // ```json を除去して JSON 文字列化
-    const jsonText = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(jsonText);
-
-    if (!Array.isArray(parsed.words) || parsed.words.length !== 10) return null;
-
-    return parsed.words;
-  } catch (e) {
-    console.error("Gemini fetch failed:", e);
-    return null;
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Gemini API error:", errText);
+    throw new Error("Gemini APIエラー");
   }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("AIレスポンスが空です");
+  }
+
+  const jsonText = text.replace(/```json|```/g, "").trim();
+  const parsed = JSON.parse(jsonText);
+
+  if (!Array.isArray(parsed.words) || parsed.words.length !== 10) {
+    throw new Error("AIの出力形式が不正です");
+  }
+
+  return parsed.words;
 }
 
 // Vercel Handler
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(200).json(getFallback());
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   const { theme } = req.body;
   if (!isValidTheme(theme)) {
-    return res.status(200).json(getFallback());
+    return res.status(400).json({ error: "Invalid theme" });
   }
 
   const normalizedTheme = theme.trim();
 
-  // キャッシュにある場合は即返す
+  // キャッシュがあれば返す
   const cached = getFromCache(normalizedTheme);
-  if (cached) return res.status(200).json(cached);
-
-  // AI生成
-  const words = await generateWithAI(normalizedTheme);
-
-  if (!words) {
-    // AI生成失敗時のみフォールバック
-    return res.status(200).json(getFallback());
+  if (cached) {
+    return res.status(200).json(cached);
   }
 
-  // AI生成成功時のみキャッシュに保存
-  wordCache.set(normalizedTheme, [...words]);
+  try {
+    const words = await generateWithAI(normalizedTheme);
 
-  // 1つ取り出して返す
-  const word = getFromCache(normalizedTheme);
-  return res.status(200).json(word);
+    // キャッシュ保存
+    wordCache.set(normalizedTheme, [...words]);
+
+    const word = getFromCache(normalizedTheme);
+    return res.status(200).json(word);
+
+  } catch (err) {
+    console.error(" Word generation failed:", err.message);
+    return res.status(500).json({
+      error: "単語生成に失敗しました"
+    });
+  }
 }
