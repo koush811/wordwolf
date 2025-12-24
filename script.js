@@ -110,6 +110,13 @@ async function startGame() {
 
 
 async function fetchWordPair() {
+    if (isLocalhost) {
+        console.log('🧪 localhost → フォールバック使用');
+        gameState.wordPair =
+            FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
+        return;
+    }
+
     try {
         const response = await fetch('/api/generate-word', {
             method: 'POST',
@@ -124,7 +131,6 @@ async function fetchWordPair() {
         const wordPair = await response.json();
 
         if (
-            !wordPair ||
             typeof wordPair.citizenWord !== 'string' ||
             typeof wordPair.wolfWord !== 'string'
         ) {
@@ -140,6 +146,7 @@ async function fetchWordPair() {
             FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)];
     }
 }
+
 
 // 単語ペアを取得する関数（APIから取得、失敗時はフォールバック）
 // 単語ペアを取得する関数（バックエンドAPIを使用）
